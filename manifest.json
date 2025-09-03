@@ -1,7 +1,7 @@
 {
   "name": "Dream Home",
   "short_name": "Dream Home",
-  "start_url": "/",
+  "start_url": "https://www.thedreamhome.online/",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#121212",
