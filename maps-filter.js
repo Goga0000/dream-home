@@ -9,7 +9,10 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   const MAP_ID = "sdfkj343jhsdfkhfgd";
-  let map, markers = [], activeMarkerIndex = null;
+  let map = null;
+  let markers = [];
+  let activeMarkerIndex = null;
+
 
   const clearMarkers = () => {
     markers.forEach((m) => m.setMap(null));
