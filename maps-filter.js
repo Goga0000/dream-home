@@ -7,10 +7,10 @@ document.addEventListener("DOMContentLoaded", () => {
     slidesPerView: "auto",
     spaceBetween: 8,
   });
-  const MAP_ID = "sdfkj343jhsdfkhfgd";
-  let map = null;
-  let markers = [];
-  let activeMarkerIndex = null;
+const MAP_ID = "sdfkj343jhsdfkhfgd";
+let map = null;
+let markers = [];
+let activeMarkerIndex = null;
   const clearMarkers = () => {
     markers.forEach((m) => m.setMap(null));
     markers = [];
