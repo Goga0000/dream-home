@@ -9,19 +9,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const MAP_ID = "sdfkj343jhsdfkhfgd";
   let map = null;
-  let markers = [];
-  let markersCache = new Map(); // Кэш для маркеров по индексу
   let activeMarkerIndex = null;
+  let markersCache = new Map(); // Кэш маркеров: ключ - индекс, значение - объект { marker, content }
 
-  const clearMarkers = () => {
-    markers.forEach((marker) => marker.setMap(null));
-    markers = [];
-  };
-
-  const createOrGetMarker = (item, i) => {
-    if (markersCache.has(i)) {
-      return markersCache.get(i);
-    }
+  const createMarkerFromItem = (item, i) => {
     const lat = parseFloat(item.dataset.lat);
     const lng = parseFloat(item.dataset.lng);
     const img = item.dataset.img || "";
@@ -55,16 +46,15 @@ document.addEventListener("DOMContentLoaded", () => {
       content: markerContent,
       title,
     });
+
     marker.addListener("gmp-click", () => setActiveMarker(i, true));
 
-    const markerObj = { marker, content: markerContent };
-    markersCache.set(i, markerObj);
-    return markerObj;
+    return { marker, content: markerContent };
   };
 
   const setActiveMarker = (idx = null, scrollSwiper = false) => {
     activeMarkerIndex = idx;
-    markers.forEach(({ content }, i) => {
+    markersCache.forEach(({ content }, i) => {
       content.style.border = i === idx ? "3px solid #4C4DDC" : "3px solid white";
       const item = document.querySelectorAll(".maps-item:not([hidden])")[i];
       if (item) item.classList.toggle("active-slide", i === idx);
@@ -79,26 +69,54 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const updateMarkers = () => {
     if (!map) return;
-    clearMarkers();
-    const items = document.querySelectorAll(".maps-item:not([hidden])");
-    if (!items.length) return;
+
+    const items = Array.from(document.querySelectorAll(".maps-item:not([hidden])"));
+    if (!items.length) {
+      // Удаляем все маркеры, если нет элементов
+      markersCache.forEach(({ marker }) => marker.setMap(null));
+      markersCache.clear();
+      return;
+    }
 
     const bounds = new google.maps.LatLngBounds();
 
-    markers = Array.from(items).map((item, i) => {
-      const markerObj = createOrGetMarker(item, i);
-      bounds.extend(markerObj.marker.position);
-      markerObj.marker.setMap(map);
-      return markerObj;
+    // Создаем новый кэш для обновленных маркеров
+    const newMarkersCache = new Map();
+
+    items.forEach((item, i) => {
+      bounds.extend({ lat: parseFloat(item.dataset.lat), lng: parseFloat(item.dataset.lng) });
+
+      if (markersCache.has(i)) {
+        // Используем существующий маркер из кэша
+        const markerObj = markersCache.get(i);
+        newMarkersCache.set(i, markerObj);
+        markersCache.delete(i);
+      } else {
+        // Создаем новый маркер
+        const markerObj = createMarkerFromItem(item, i);
+        newMarkersCache.set(i, markerObj);
+      }
     });
 
+    // Удаляем маркеры, которые остались в старом кэше (они не нужны)
+    markersCache.forEach(({ marker }) => marker.setMap(null));
+
+    // Обновляем кэш
+    markersCache = newMarkersCache;
+
+    // Отобразить все маркеры
+    markersCache.forEach(({ marker }) => marker.setMap(map));
+
+    // Подстраиваем карту под маркеры
     if (items.length > 1) {
       map.fitBounds(bounds, 80);
     } else {
-      const { lat, lng } = markers[0].marker.position.toJSON();
+      const lat = parseFloat(items[0].dataset.lat);
+      const lng = parseFloat(items[0].dataset.lng);
       map.setCenter({ lat, lng });
       map.setZoom(13);
     }
+
     setActiveMarker(null);
   };
 
@@ -147,6 +165,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (retries > 0) setTimeout(() => waitForMapInit(retries - 1), 300);
       return;
     }
+
     map = new google.maps.Map(mapEl, {
       zoom: 11,
       center: { lat: parseFloat(firstItem.dataset.lat), lng: parseFloat(firstItem.dataset.lng) },
@@ -154,6 +173,7 @@ document.addEventListener("DOMContentLoaded", () => {
       disableDefaultUI: true,
     });
     map.addListener("click", () => setActiveMarker(null));
+
     updateMarkers();
     animateBarGraph();
   };
