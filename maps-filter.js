@@ -3,7 +3,6 @@ document.addEventListener("DOMContentLoaded", () => {
     loop: false,
     autoplay: false,
     slidesPerView: "auto",
-    spaceBetween: 8,
     centeredSlides: true,
   });
 
