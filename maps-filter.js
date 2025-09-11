@@ -5,6 +5,7 @@ document.addEventListener("DOMContentLoaded", () => {
     freeMode: true,
     slidesPerView: "auto",
     spaceBetween: 8,
+    centeredSlides: true,
   });
 
   const MAP_ID = "sdfkj343jhsdfkhfgd";
