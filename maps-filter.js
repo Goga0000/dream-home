@@ -2,7 +2,6 @@ document.addEventListener("DOMContentLoaded", () => {
   window.swiperInstance = new Swiper(".swiper", {
     loop: false,
     autoplay: false,
-    freeMode: true,
     slidesPerView: "auto",
     spaceBetween: 8,
     centeredSlides: true,
