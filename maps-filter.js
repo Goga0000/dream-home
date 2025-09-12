@@ -183,11 +183,20 @@ document.addEventListener("DOMContentLoaded", () => {
     setActiveMarker(window.swiperInstance.activeIndex, false);
   });
 
-  const rerender = () => {
-    if (map) updateMarkers();
-    if (window.swiperInstance) window.swiperInstance.update();
-    setActiveMarker(null);
-  };
+const rerender = () => {
+  if (map) updateMarkers();
+  if (window.swiperInstance) {
+    window.swiperInstance.update();
+    // Проверяем активный индекс и корректируем если нужно
+    const swiper = window.swiperInstance;
+    const slidesLength = swiper.slides.length;
+    if (swiper.activeIndex >= slidesLength) {
+      swiper.slideTo(slidesLength - 1, 0); // Переход моментальный к последнему допустимому слайду
+    }
+  }
+  setActiveMarker(null);
+};
+
 
   document.addEventListener("fs-cmsfilter-update", rerender);
   document.getElementById("btts-load")?.addEventListener("click", () => setTimeout(rerender, 400));
