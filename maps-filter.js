@@ -5,10 +5,12 @@ document.addEventListener("DOMContentLoaded", () => {
     slidesPerView: "auto",
     centeredSlides: true,
   });
+
   const MAP_ID = "sdfkj343jhsdfkhfgd";
   let map = null;
   let activeMarkerIndex = null;
   let markersCache = new Map(); // Кэш маркеров: ключ - индекс, значение - объект { marker, content }
+
   const createMarkerFromItem = (item, i) => {
     const lat = parseFloat(item.dataset.lat);
     const lng = parseFloat(item.dataset.lng);
@@ -43,6 +45,7 @@ document.addEventListener("DOMContentLoaded", () => {
     marker.addListener("gmp-click", () => setActiveMarker(i, true));
     return { marker, content: markerContent };
   };
+
   const setActiveMarker = (idx = null, scrollSwiper = false) => {
     activeMarkerIndex = idx;
     markersCache.forEach(({ content }, i) => {
@@ -57,6 +60,7 @@ document.addEventListener("DOMContentLoaded", () => {
       window.swiperInstance.slideTo(idx);
     }
   };
+
   const updateMarkers = () => {
     if (!map) return;
     const items = Array.from(document.querySelectorAll(".maps-item:not([hidden])"));
@@ -99,6 +103,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     setActiveMarker(null);
   };
+
   const animateBarGraph = () => {
     const priceElements = document.querySelectorAll("[data-price]");
     if (!priceElements.length) return;
@@ -129,6 +134,7 @@ document.addEventListener("DOMContentLoaded", () => {
       animateHeight(bar, height, 800);
     });
   };
+
   const waitForMapInit = (retries = 20) => {
     const mapEl = document.getElementById("custom-map");
     const firstItem = document.querySelector(".maps-item:not([hidden])");
@@ -143,26 +149,31 @@ document.addEventListener("DOMContentLoaded", () => {
       disableDefaultUI: true,
     });
     map.addListener("click", () => setActiveMarker(null));
+    
+    // тут добавленная проверка маркеров, чтобы первично отобразить только актуальные согласно фильтрам
     updateMarkers();
+    
     animateBarGraph();
   };
   window.initMap = () => waitForMapInit();
+
   window.swiperInstance.on("slideChange", () => {
     setActiveMarker(window.swiperInstance.activeIndex, false);
   });
-const rerender = () => {
-  if (map) updateMarkers();
-  if (window.swiperInstance) {
-    window.swiperInstance.update();
-    // Проверяем активный индекс и корректируем если нужно
-    const swiper = window.swiperInstance;
-    const slidesLength = swiper.slides.length;
-    if (swiper.activeIndex >= slidesLength) {
-      swiper.slideTo(slidesLength - 1, 0); // Переход моментальный к последнему допустимому слайду
+
+  const rerender = () => {
+    if (map) updateMarkers();
+    if (window.swiperInstance) {
+      window.swiperInstance.update();
+      const swiper = window.swiperInstance;
+      const slidesLength = swiper.slides.length;
+      if (swiper.activeIndex >= slidesLength) {
+        swiper.slideTo(slidesLength - 1, 0); // Переход моментальный к последнему допустимому слайду
+      }
     }
-  }
-  setActiveMarker(null);
-};
+    setActiveMarker(null);
+  };
+
   document.addEventListener("fs-cmsfilter-update", rerender);
   document.getElementById("btts-load")?.addEventListener("click", () => setTimeout(rerender, 400));
   document.querySelector('[fs-list-element="clear"]')?.addEventListener("click", () => setTimeout(rerender, 400));
