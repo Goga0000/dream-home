@@ -1,10 +1,14 @@
 document.addEventListener("DOMContentLoaded", () => {
+  window.swiperInstance = new Swiper(".swiper", {
+    loop: false,
+    autoplay: false,
+    slidesPerView: "auto",
+    centeredSlides: true,
+  });
   const MAP_ID = "sdfkj343jhsdfkhfgd";
   let map = null;
   let activeMarkerIndex = null;
-  let markersCache = new Map();
-
-  // Создание маркера из элемента
+  let markersCache = new Map(); // Кэш маркеров: ключ - индекс, значение - объект { marker, content }
   const createMarkerFromItem = (item, i) => {
     const lat = parseFloat(item.dataset.lat);
     const lng = parseFloat(item.dataset.lng);
@@ -39,8 +43,6 @@ document.addEventListener("DOMContentLoaded", () => {
     marker.addListener("gmp-click", () => setActiveMarker(i, true));
     return { marker, content: markerContent };
   };
-
-  // Активный маркер и подсветка
   const setActiveMarker = (idx = null, scrollSwiper = false) => {
     activeMarkerIndex = idx;
     markersCache.forEach(({ content }, i) => {
@@ -48,45 +50,45 @@ document.addEventListener("DOMContentLoaded", () => {
       const item = document.querySelectorAll(".maps-item:not([hidden])")[i];
       if (item) item.classList.toggle("active-slide", i === idx);
     });
-    if (window.swiperInstance) {
-      document.querySelectorAll(".swiper-slide").forEach((slide, i) =>
-        slide.classList.toggle("active-slide", i === idx)
-      );
-      if (scrollSwiper && idx !== null) {
-        window.swiperInstance.slideTo(idx);
-      }
+    document.querySelectorAll(".swiper-slide").forEach((slide, i) =>
+      slide.classList.toggle("active-slide", i === idx)
+    );
+    if (scrollSwiper && window.swiperInstance?.slideTo && idx !== null) {
+      window.swiperInstance.slideTo(idx);
     }
   };
-
-  // Обновление маркеров — показываем только видимые
   const updateMarkers = () => {
     if (!map) return;
     const items = Array.from(document.querySelectorAll(".maps-item:not([hidden])"));
     if (!items.length) {
+      // Удаляем все маркеры, если нет элементов
       markersCache.forEach(({ marker }) => marker.setMap(null));
       markersCache.clear();
       return;
     }
-
     const bounds = new google.maps.LatLngBounds();
+    // Создаем новый кэш для обновленных маркеров
     const newMarkersCache = new Map();
-
     items.forEach((item, i) => {
       bounds.extend({ lat: parseFloat(item.dataset.lat), lng: parseFloat(item.dataset.lng) });
       if (markersCache.has(i)) {
+        // Используем существующий маркер из кэша
         const markerObj = markersCache.get(i);
         newMarkersCache.set(i, markerObj);
         markersCache.delete(i);
       } else {
+        // Создаем новый маркер
         const markerObj = createMarkerFromItem(item, i);
         newMarkersCache.set(i, markerObj);
       }
     });
-
+    // Удаляем маркеры, которые остались в старом кэше (они не нужны)
     markersCache.forEach(({ marker }) => marker.setMap(null));
+    // Обновляем кэш
     markersCache = newMarkersCache;
+    // Отобразить все маркеры
     markersCache.forEach(({ marker }) => marker.setMap(map));
-
+    // Подстраиваем карту под маркеры
     if (items.length > 1) {
       map.fitBounds(bounds, 80);
     } else {
@@ -97,8 +99,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     setActiveMarker(null);
   };
-
-  // Анимация графика (баров)
   const animateBarGraph = () => {
     const priceElements = document.querySelectorAll("[data-price]");
     if (!priceElements.length) return;
@@ -129,100 +129,41 @@ document.addEventListener("DOMContentLoaded", () => {
       animateHeight(bar, height, 800);
     });
   };
-
-  // Инициализация карты и маркеров — возвращает Promise
-  function initializeMap() {
-    return new Promise((resolve, reject) => {
-      const mapEl = document.getElementById("custom-map");
-      const allItems = document.querySelectorAll(".maps-item");
-      if (!mapEl || allItems.length === 0) {
-        reject("Map container or items missing");
-        return;
-      }
-
-      map = new google.maps.Map(mapEl, {
-        zoom: 11,
-        center: {
-          lat: parseFloat(allItems[0].dataset.lat),
-          lng: parseFloat(allItems[0].dataset.lng),
-        },
-        mapId: MAP_ID,
-        disableDefaultUI: true,
-      });
-
-      map.addListener("click", () => setActiveMarker(null));
-
-      markersCache.clear();
-      allItems.forEach((item, i) => {
-        const markerObj = createMarkerFromItem(item, i);
-        markersCache.set(i, markerObj);
-        markerObj.marker.setMap(map);
-      });
-
-      const bounds = new google.maps.LatLngBounds();
-      allItems.forEach(item => {
-        bounds.extend({ lat: parseFloat(item.dataset.lat), lng: parseFloat(item.dataset.lng) });
-      });
-      map.fitBounds(bounds);
-
-      animateBarGraph();
-
-      resolve();
-    });
-  }
-
-  // Инициализация Swiper — возвращает Promise
-  function initializeSwiper() {
-    return new Promise((resolve) => {
-      window.swiperInstance = new Swiper(".swiper", {
-        loop: false,
-        autoplay: false,
-        slidesPerView: "auto",
-        centeredSlides: true,
-      });
-
-      window.swiperInstance.on("slideChange", () => {
-        setActiveMarker(window.swiperInstance.activeIndex, false);
-      });
-
-      resolve();
-    });
-  }
-
-  // Обновление маркеров и слайдера после фильтров
-  function applyFiltersAndRerender() {
-    rerender();
-  }
-
-  // Функция rerender с обновлением карты, маркеров, слайдера
-  const rerender = () => {
-    if (map) updateMarkers();
-    if (window.swiperInstance) {
-      window.swiperInstance.update();
-      const swiper = window.swiperInstance;
-      const slidesLength = swiper.slides.length;
-      if (swiper.activeIndex >= slidesLength) {
-        swiper.slideTo(slidesLength - 1, 0);
-      }
+  const waitForMapInit = (retries = 20) => {
+    const mapEl = document.getElementById("custom-map");
+    const firstItem = document.querySelector(".maps-item:not([hidden])");
+    if (!mapEl || !firstItem || mapEl.offsetHeight === 0) {
+      if (retries > 0) setTimeout(() => waitForMapInit(retries - 1), 300);
+      return;
     }
-    setActiveMarker(null);
-  };
-
-  // Запуск последовательной инициализации
-  initializeMap()
-    .then(() => initializeSwiper())
-    .then(() => {
-      document.addEventListener("fs-cmsfilter-update", () => {
-        applyFiltersAndRerender();
-      });
-      // Если фильтры уже применены из URL, вызвать сразу
-      applyFiltersAndRerender();
-    })
-    .catch(err => {
-      console.error("Ошибка инициализации карты и слайдера:", err);
+    map = new google.maps.Map(mapEl, {
+      zoom: 11,
+      center: { lat: parseFloat(firstItem.dataset.lat), lng: parseFloat(firstItem.dataset.lng) },
+      mapId: MAP_ID,
+      disableDefaultUI: true,
     });
-
-  // Дополнительные привязки для обновления
+    map.addListener("click", () => setActiveMarker(null));
+    updateMarkers();
+    animateBarGraph();
+  };
+  window.initMap = () => waitForMapInit();
+  window.swiperInstance.on("slideChange", () => {
+    setActiveMarker(window.swiperInstance.activeIndex, false);
+  });
+const rerender = () => {
+  if (map) updateMarkers();
+  if (window.swiperInstance) {
+    window.swiperInstance.update();
+    // Проверяем активный индекс и корректируем если нужно
+    const swiper = window.swiperInstance;
+    const slidesLength = swiper.slides.length;
+    if (swiper.activeIndex >= slidesLength) {
+      swiper.slideTo(slidesLength - 1, 0); // Переход моментальный к последнему допустимому слайду
+    }
+  }
+  setActiveMarker(null);
+};
+  document.addEventListener("fs-cmsfilter-update", rerender);
   document.getElementById("btts-load")?.addEventListener("click", () => setTimeout(rerender, 400));
   document.querySelector('[fs-list-element="clear"]')?.addEventListener("click", () => setTimeout(rerender, 400));
   document.addEventListener("click", (e) => {
