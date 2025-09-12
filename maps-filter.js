@@ -9,7 +9,6 @@ document.addEventListener("DOMContentLoaded", () => {
   let map = null;
   let activeMarkerIndex = null;
   let markersCache = new Map(); // Кэш маркеров: ключ - индекс, значение - объект { marker, content }
-
   const createMarkerFromItem = (item, i) => {
     const lat = parseFloat(item.dataset.lat);
     const lng = parseFloat(item.dataset.lng);
@@ -44,7 +43,6 @@ document.addEventListener("DOMContentLoaded", () => {
     marker.addListener("gmp-click", () => setActiveMarker(i, true));
     return { marker, content: markerContent };
   };
-
   const setActiveMarker = (idx = null, scrollSwiper = false) => {
     activeMarkerIndex = idx;
     markersCache.forEach(({ content }, i) => {
@@ -59,43 +57,6 @@ document.addEventListener("DOMContentLoaded", () => {
       window.swiperInstance.slideTo(idx);
     }
   };
-
-  // Инициализация карты и создание маркеров для всех элементов сразу при загрузке
-  const initializeMapAndMarkers = () => {
-    const mapEl = document.getElementById("custom-map");
-    const allItems = document.querySelectorAll(".maps-item");
-    if (!mapEl || allItems.length === 0) return;
-
-    map = new google.maps.Map(mapEl, {
-      zoom: 11,
-      center: {
-        lat: parseFloat(allItems[0].dataset.lat),
-        lng: parseFloat(allItems[0].dataset.lng),
-      },
-      mapId: MAP_ID,
-      disableDefaultUI: true,
-    });
-
-    map.addListener("click", () => setActiveMarker(null));
-
-    // Создаем маркеры для всех элементов
-    markersCache.clear();
-    allItems.forEach((item, i) => {
-      const markerObj = createMarkerFromItem(item, i);
-      markersCache.set(i, markerObj);
-      markerObj.marker.setMap(map);
-    });
-
-    // Устанавливаем границы карты по всем маркерам
-    const bounds = new google.maps.LatLngBounds();
-    allItems.forEach(item => {
-      bounds.extend({ lat: parseFloat(item.dataset.lat), lng: parseFloat(item.dataset.lng) });
-    });
-    map.fitBounds(bounds);
-
-    animateBarGraph();
-  };
-
   const updateMarkers = () => {
     if (!map) return;
     const items = Array.from(document.querySelectorAll(".maps-item:not([hidden])"));
@@ -138,7 +99,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     setActiveMarker(null);
   };
-
   const animateBarGraph = () => {
     const priceElements = document.querySelectorAll("[data-price]");
     if (!priceElements.length) return;
@@ -169,29 +129,40 @@ document.addEventListener("DOMContentLoaded", () => {
       animateHeight(bar, height, 800);
     });
   };
-
-  // Функция rerender с проверкой активного слайда
-  const rerender = () => {
-    if (map) updateMarkers();
-    if (window.swiperInstance) {
-      window.swiperInstance.update();
-      const swiper = window.swiperInstance;
-      const slidesLength = swiper.slides.length;
-      if (swiper.activeIndex >= slidesLength) {
-        swiper.slideTo(slidesLength - 1, 0);
-      }
+  const waitForMapInit = (retries = 20) => {
+    const mapEl = document.getElementById("custom-map");
+    const firstItem = document.querySelector(".maps-item:not([hidden])");
+    if (!mapEl || !firstItem || mapEl.offsetHeight === 0) {
+      if (retries > 0) setTimeout(() => waitForMapInit(retries - 1), 300);
+      return;
     }
-    setActiveMarker(null);
+    map = new google.maps.Map(mapEl, {
+      zoom: 11,
+      center: { lat: parseFloat(firstItem.dataset.lat), lng: parseFloat(firstItem.dataset.lng) },
+      mapId: MAP_ID,
+      disableDefaultUI: true,
+    });
+    map.addListener("click", () => setActiveMarker(null));
+    updateMarkers();
+    animateBarGraph();
   };
-
-  // Инициация карты и маркеров при загрузке
-  initializeMapAndMarkers();
-
+  window.initMap = () => waitForMapInit();
   window.swiperInstance.on("slideChange", () => {
     setActiveMarker(window.swiperInstance.activeIndex, false);
   });
-
-  // Привязка событий к обновлению после фильтров и других действий
+const rerender = () => {
+  if (map) updateMarkers();
+  if (window.swiperInstance) {
+    window.swiperInstance.update();
+    // Проверяем активный индекс и корректируем если нужно
+    const swiper = window.swiperInstance;
+    const slidesLength = swiper.slides.length;
+    if (swiper.activeIndex >= slidesLength) {
+      swiper.slideTo(slidesLength - 1, 0); // Переход моментальный к последнему допустимому слайду
+    }
+  }
+  setActiveMarker(null);
+};
   document.addEventListener("fs-cmsfilter-update", rerender);
   document.getElementById("btts-load")?.addEventListener("click", () => setTimeout(rerender, 400));
   document.querySelector('[fs-list-element="clear"]')?.addEventListener("click", () => setTimeout(rerender, 400));
